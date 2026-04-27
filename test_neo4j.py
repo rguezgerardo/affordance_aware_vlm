@@ -8,9 +8,9 @@ from neo4j import GraphDatabase
 
 
 # change to the appropriate credentials
-NEO4J_URI = "[REDACTED]"
-NEO4J_AUTH = ("[REDACTED]", "[REDACTED]")
-NEO4J_DATABASE = "[REDACTED]"
+NEO4J_URI = "neo4j+s://b20ae93c.databases.neo4j.io"
+NEO4J_AUTH = ("b20ae93c", "QTnkFOZZY3yOIarhieQ_quH4OP7HNrQeEj3KpgHTlcU")
+NEO4J_DATABASE = "b20ae93c"
 
 def get_neo4j_driver():
     return GraphDatabase.driver(

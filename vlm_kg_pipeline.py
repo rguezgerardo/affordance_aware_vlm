@@ -11,6 +11,9 @@ from qwen_vl_utils import process_vision_info
 from test_neo4j import get_graph_context
 from test_neo4j import get_mock_graph_context
 
+from pathlib import Path
+default_logging_path = ""
+KG_logging_path = ""
 
 MODEL_ID = "Qwen/Qwen2.5-VL-7B-Instruct"
 
@@ -284,12 +287,27 @@ def run_pipeline(image_path: str):
     print("[1] Loading Qwen...")
     model, processor = load_qwen()
 
-    print("[2] Extracting scene facts from image...")
+    print("[2] Getting Qwen response w/o KG...")
+    default_answer = default_response(
+        model=model,
+        processor=processor,
+        image_path=image_path)
+    print("\nDefault Answer:")
+    print(default_answer)
+    with open(default_logging_path, "a") as f:
+        f.write("\nDefault Answer:" + "\n")
+        f.write(default_answer + "\n")
+
+    print("[3] Extracting scene facts from image...")
     scene = get_scene_facts(model, processor, image_path)
     print("\nScene extracted by Qwen:")
     print(json.dumps(scene, indent=2))
 
-    print("[3] Querying Neo4j knowledge graph...")
+    with open(KG_logging_path, "a") as f:
+        f.write("Extracting scene facts from image..." + "\n")
+        f.write(json.dumps(scene, indent=2) + "\n")
+
+    print("[4] Querying Neo4j knowledge graph...")
     graph_context = get_graph_context(scene) # should work now
     # try:
     #     graph_context = get_graph_context(scene)
@@ -298,8 +316,11 @@ def run_pipeline(image_path: str):
     #graph_context = get_mock_graph_context(scene)
     print("\nGraph context returned by KG:")
     print(json.dumps(graph_context, indent=2))
+    with open(KG_logging_path, "a") as f:
+        f.write("nGraph context returned by KG:" + "\n")
+        f.write(json.dumps(graph_context, indent=2) + "\n")
 
-    print("[4] Asking Qwen for final safety judgment using KG context...")
+    print("[5] Asking Qwen for final safety judgment using KG context...")
     final_answer = get_final_answer(
         model=model,
         processor=processor,
@@ -310,6 +331,39 @@ def run_pipeline(image_path: str):
 
     print("\nFinal Answer:")
     print(final_answer)
+    with open(KG_logging_path, "a") as f:
+        f.write("\nFinal Answer:" + "\n")
+        f.write(final_answer + "\n")
+
+
+def default_response(model, processor, image_path):
+    prompt = f"""
+    You are a physical safety reasoning assistant.
+
+    Return the final answer in this exact format:
+
+    Safety Label: safe / caution / unsafe / unknown
+
+    Main Reason:
+    One or two sentences explaining the most important physical risk.
+
+    Recommended Action:
+    One sentence.
+
+    Do not invent risks that are not supported by either the image
+    """
+
+    return qwen_infer(model, processor, image_path, prompt, max_new_tokens=256)
+
+
+def logging_setup(image_path):
+    global default_logging_path
+    global KG_logging_path
+    clean_name = Path(image_path).stem 
+    
+    default_logging_path = f"default_logging/default_{clean_name}.txt"
+    KG_logging_path = f"KG_logging/KG_{clean_name}.txt"
+
 
 if __name__ == "__main__":
     import argparse
@@ -317,5 +371,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--image", required=True, help="Path to input image")
     args = parser.parse_args()
-
+    logging_setup(args.image)
     run_pipeline(args.image)
